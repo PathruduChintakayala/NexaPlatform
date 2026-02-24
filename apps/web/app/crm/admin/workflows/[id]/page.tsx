@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteWorkflowRule, getErrorToastMessage, getWorkflowRule, type ApiToastMessage, updateWorkflowRule } from "../../../../../lib/api";
 import { getCurrentRoles, hasPermission } from "../../../../../lib/permissions";
 import { queryKeys } from "../../../../../lib/queryKeys";
-import { WorkflowCreateModal } from "../../../../../components/crm/admin/WorkflowCreateModal";
+import { WorkflowFormModal } from "../../../../../components/crm/admin/WorkflowFormModal";
 import { WorkflowDryRunForm } from "../../../../../components/crm/admin/WorkflowDryRunForm";
 import { WorkflowExecutionsTable } from "../../../../../components/crm/admin/WorkflowExecutionsTable";
 import { WorkflowRuleDetailHeader } from "../../../../../components/crm/admin/WorkflowRuleDetailHeader";
@@ -151,16 +151,16 @@ export default function WorkflowRuleDetailPage({ params }: PageProps) {
       </div>
 
       {canManage ? (
-        <WorkflowCreateModal
+        <WorkflowFormModal
           open={editOpen}
           mode="edit"
           initialRule={rule}
           onClose={() => setEditOpen(false)}
-          onSuccess={(message) => {
+          onSuccess={(message: string) => {
             setToast(message);
             void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.detail(params.id) });
           }}
-          onError={(message) => setToast(message)}
+          onError={(message: ApiToastMessage) => setToast(message)}
         />
       ) : null}
 

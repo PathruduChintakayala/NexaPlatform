@@ -1,0 +1,29 @@
+# Node
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+coverage/
+
+# Python
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+*.pyc
+.vscode/
+# Env
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+
+# Alembic
+apps/api/alembic/versions/*.pyc

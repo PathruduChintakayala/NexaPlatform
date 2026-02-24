@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "nexa-api"
+version = "0.1.0"
+description = "Nexa modular monolith API"
+authors = ["Nexa Platform"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.116.0"
+uvicorn = { extras = ["standard"], version = "^0.35.0" }
+sqlalchemy = "^2.0.40"
+psycopg = { extras = ["binary"], version = "^3.2.9" }
+alembic = "^1.14.1"
+pydantic = "^2.11.0"
+pydantic-settings = "^2.8.1"
+python-jose = { extras = ["cryptography"], version = "^3.4.0" }
+celery = "^5.4.0"
+redis = "^5.2.1"
+opentelemetry-api = "==1.28.2"
+opentelemetry-sdk = "==1.28.2"
+opentelemetry-instrumentation-fastapi = "==0.49b2"
+opentelemetry-instrumentation-asgi = "==0.49b2"
+opentelemetry-exporter-otlp = "==1.28.2"
+prometheus-client = "^0.21.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+pytest-asyncio = "^0.25.3"
+httpx = "^0.28.1"
+ruff = "^0.11.0"
+mypy = "^1.15.0"
+
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_return_any = true
+plugins = []

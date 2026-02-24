@@ -1,0 +1,87 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexa-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nexa}
+      POSTGRES_USER: ${POSTGRES_USER:-nexa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexa}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexa} -d ${POSTGRES_DB:-nexa}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexa-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: nexa-api
+    working_dir: /workspace/apps/api
+    command: >
+      sh -c "poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi &&
+      poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    env_file:
+      - ../apps/api/.env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://nexa:nexa@postgres:5432/nexa
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ..:/workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/web.Dockerfile
+    container_name: nexa-web
+    working_dir: /workspace
+    command: sh -c "pnpm install && pnpm --filter @nexa/web dev"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    env_file:
+      - ../apps/web/.env.example
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - ..:/workspace
+      - web_node_modules:/workspace/node_modules
+    depends_on:
+      - api
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: nexa-pgadmin
+    profiles: ["admin"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@nexa.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  web_node_modules:

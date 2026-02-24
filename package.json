@@ -1,0 +1,26 @@
+{
+  "name": "nexa-platform",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.5.2",
+  "scripts": {
+    "dev": "docker compose -f infra/docker-compose.yml up --build",
+    "dev:down": "docker compose -f infra/docker-compose.yml down",
+    "dev:clean": "docker compose -f infra/docker-compose.yml down -v",
+    "migrate": "docker compose -f infra/docker-compose.yml exec api poetry run alembic upgrade head",
+    "migrate:create": "docker compose -f infra/docker-compose.yml exec api poetry run alembic revision --autogenerate -m",
+    "api:test": "docker compose -f infra/docker-compose.yml exec api poetry run pytest",
+    "web:lint": "pnpm --filter @nexa/web lint",
+    "web:test": "pnpm --filter @nexa/web test",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.24.1",
+    "@typescript-eslint/parser": "^8.24.1",
+    "eslint": "^9.20.1",
+    "eslint-config-prettier": "^10.0.1",
+    "prettier": "^3.5.2",
+    "typescript": "^5.7.3"
+  }
+}

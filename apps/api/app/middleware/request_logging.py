@@ -15,13 +15,14 @@ logger = logging.getLogger("app.request")
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
         method = request.method
-        path = resolve_http_path_label(request)
+        fallback_path = resolve_http_path_label(request)
 
         started = time.perf_counter()
         try:
             response = await call_next(request)
         except Exception:
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
+            path = resolve_http_path_label(request) or fallback_path
             observe_http_request(method=method, path=path, status=500, duration=duration_ms / 1000)
             logger.error(
                 "http.error",
@@ -36,6 +37,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             raise
 
         duration_ms = round((time.perf_counter() - started) * 1000, 2)
+        path = resolve_http_path_label(request) or fallback_path
         observe_http_request(
             method=method,
             path=path,

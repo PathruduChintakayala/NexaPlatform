@@ -17,6 +17,7 @@ from app.crm.models import CRMActivity, CRMLead, CRMNotificationIntent
 from app.crm.service import ActorUser
 from app.main import app
 from app.middleware.rate_limit import reset_rate_limiter
+from app.platform.security.policies import InMemoryPolicyBackend, set_policy_backend
 
 
 @pytest.fixture()
@@ -40,11 +41,13 @@ def db_session() -> Generator[Session, None, None]:
 def setup_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     monkeypatch.setenv("RATE_LIMIT_DISABLED", "true")
     get_settings.cache_clear()
+    set_policy_backend(InMemoryPolicyBackend(default_allow=True))
     reset_rate_limiter()
     audit.audit_entries.clear()
     events.published_events.clear()
     yield
     get_settings.cache_clear()
+    set_policy_backend(InMemoryPolicyBackend(default_allow=True))
     reset_rate_limiter()
     audit.audit_entries.clear()
     events.published_events.clear()
@@ -78,6 +81,8 @@ def client(
                 "crm.custom_fields.manage",
                 "crm.custom_fields.read",
             },
+            allowed_region_codes=["US"],
+            is_super_admin=True,
             correlation_id="wf-admin-corr",
         ),
         "executor": ActorUser(
@@ -89,6 +94,7 @@ def client(
                 "crm.workflows.execute",
                 "crm.leads.read",
             },
+            allowed_region_codes=["US"],
             correlation_id="wf-exec-corr",
         ),
         "viewer": ActorUser(
@@ -96,6 +102,7 @@ def client(
             allowed_legal_entity_ids=[legal_entities["le1"]],
             current_legal_entity_id=legal_entities["le1"],
             permissions={"crm.workflows.read", "crm.leads.read"},
+            allowed_region_codes=["US"],
             correlation_id="wf-view-corr",
         ),
         "le2_user": ActorUser(
@@ -103,6 +110,7 @@ def client(
             allowed_legal_entity_ids=[legal_entities["le2"]],
             current_legal_entity_id=legal_entities["le2"],
             permissions={"crm.workflows.read", "crm.workflows.execute", "crm.leads.read"},
+            allowed_region_codes=["EU"],
             correlation_id="wf-le2-corr",
         ),
     }
@@ -431,3 +439,75 @@ def test_execute_persists_setfield_customfield_task_notify_and_audit(
     assert notification.recipient_user_id == notify_user_id
 
     assert any(entry["action"] == "workflow.executed" for entry in audit.audit_entries)
+
+
+def test_workflow_set_field_blocked_by_fls(
+    client: tuple[TestClient, Callable[[str], None]],
+    legal_entities: dict[str, uuid.UUID],
+) -> None:
+    test_client, set_actor = client
+    set_actor("admin")
+
+    lead_created = test_client.post("/api/crm/leads", json=_create_lead_payload(legal_entities["le1"]))
+    assert lead_created.status_code == 201
+    lead = lead_created.json()
+
+    rule = _create_rule(
+        test_client,
+        {
+            "name": "FLS blocked set-field",
+            "trigger_event": "crm.lead.updated",
+            "condition_json": {"path": "status", "op": "eq", "value": "New"},
+            "actions_json": [{"type": "SET_FIELD", "path": "qualification_notes", "value": "blocked"}],
+        },
+    )
+
+    set_policy_backend(InMemoryPolicyBackend(default_allow=False))
+    try:
+        response = test_client.post(
+            f"/api/crm/workflows/{rule['id']}/execute",
+            json={"entity_type": "lead", "entity_id": lead["id"]},
+        )
+    finally:
+        set_policy_backend(InMemoryPolicyBackend(default_allow=True))
+
+    assert response.status_code == 403
+    body = response.json()
+    detail = body.get("detail", body.get("error", body))
+    assert "forbidden_fields" in str(detail)
+
+
+def test_workflow_set_field_blocked_by_rls_region_and_admin_bypass(
+    client: tuple[TestClient, Callable[[str], None]],
+    legal_entities: dict[str, uuid.UUID],
+) -> None:
+    test_client, set_actor = client
+
+    set_actor("admin")
+    lead_created = test_client.post("/api/crm/leads", json=_create_lead_payload(legal_entities["le1"]))
+    assert lead_created.status_code == 201
+    lead = lead_created.json()
+
+    rule = _create_rule(
+        test_client,
+        {
+            "name": "RLS region guard",
+            "trigger_event": "crm.lead.updated",
+            "condition_json": {"path": "status", "op": "eq", "value": "New"},
+            "actions_json": [{"type": "SET_FIELD", "path": "region_code", "value": "EU"}],
+        },
+    )
+
+    set_actor("executor")
+    blocked = test_client.post(
+        f"/api/crm/workflows/{rule['id']}/execute",
+        json={"entity_type": "lead", "entity_id": lead["id"]},
+    )
+    assert blocked.status_code == 403
+
+    set_actor("admin")
+    allowed = test_client.post(
+        f"/api/crm/workflows/{rule['id']}/execute",
+        json={"entity_type": "lead", "entity_id": lead["id"]},
+    )
+    assert allowed.status_code == 200

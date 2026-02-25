@@ -29,7 +29,15 @@ import type {
   WorkflowDryRunResponse,
   WorkflowRuleCreate,
   WorkflowRuleRead,
-  WorkflowRuleUpdate
+  WorkflowRuleUpdate,
+  FinanceARAgingReport,
+  FinanceCashSummaryReport,
+  FinanceInvoiceDrilldown,
+  FinanceJournalDrilldown,
+  FinancePaymentDrilldown,
+  FinanceReconciliationReport,
+  FinanceRevenueSummaryReport,
+  FinanceTrialBalanceReport
 } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -525,4 +533,43 @@ export function getErrorToastMessage(error: unknown): ApiToastMessage {
 
 export function getErrorMessage(error: unknown) {
   return getErrorToastMessage(error).message;
+}
+
+export interface FinanceReportParams {
+  tenant_id: string;
+  company_code?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export function getFinanceArAging(params: { tenant_id: string; company_code?: string; as_of_date?: string }) {
+  return apiRequest<FinanceARAgingReport>(`/reports/finance/ar-aging${toQuery(params)}`);
+}
+
+export function getFinanceTrialBalance(params: FinanceReportParams) {
+  return apiRequest<FinanceTrialBalanceReport>(`/reports/finance/trial-balance${toQuery(params)}`);
+}
+
+export function getFinanceCashSummary(params: FinanceReportParams) {
+  return apiRequest<FinanceCashSummaryReport>(`/reports/finance/cash-summary${toQuery(params)}`);
+}
+
+export function getFinanceRevenueSummary(params: FinanceReportParams) {
+  return apiRequest<FinanceRevenueSummaryReport>(`/reports/finance/revenue-summary${toQuery(params)}`);
+}
+
+export function getFinanceReconciliation(params: FinanceReportParams) {
+  return apiRequest<FinanceReconciliationReport>(`/reports/finance/reconciliation${toQuery(params)}`);
+}
+
+export function getFinanceInvoiceDrilldown(invoiceId: string) {
+  return apiRequest<FinanceInvoiceDrilldown>(`/reports/finance/drilldowns/invoices/${invoiceId}`);
+}
+
+export function getFinancePaymentDrilldown(paymentId: string) {
+  return apiRequest<FinancePaymentDrilldown>(`/reports/finance/drilldowns/payments/${paymentId}`);
+}
+
+export function getFinanceJournalDrilldown(entryId: string) {
+  return apiRequest<FinanceJournalDrilldown>(`/reports/finance/drilldowns/journal-entries/${entryId}`);
 }

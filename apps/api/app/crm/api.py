@@ -148,6 +148,7 @@ def _parse_uuid_list(raw: str | None) -> list[uuid.UUID]:
 def get_current_user(request: Request, auth_user: AuthUser = Depends(get_auth_user)) -> ActorUser:
     correlation_id = get_correlation_id() or getattr(getattr(request.state, "context", None), "request_id", None)
     legal_entity_header = request.headers.get("x-allowed-legal-entities")
+    region_header = request.headers.get("x-allowed-regions")
     current_legal_entity_raw = request.headers.get("x-current-legal-entity")
 
     if current_legal_entity_raw:
@@ -165,11 +166,22 @@ def get_current_user(request: Request, auth_user: AuthUser = Depends(get_auth_us
     if not allowed_legal_entities and current_legal_entity_id is not None:
         allowed_legal_entities = [current_legal_entity_id]
 
+    allowed_regions = [item.strip() for item in (region_header or "").split(",") if item.strip()]
+    if not allowed_regions:
+        current_region = getattr(getattr(request.state, "context", None), "region", None)
+        if isinstance(current_region, str) and current_region and current_region.lower() != "global":
+            allowed_regions = [current_region]
+
+    normalized_roles = {str(role).lower() for role in auth_user.roles}
+    is_super_admin = "admin" in normalized_roles or "system.admin" in normalized_roles
+
     return ActorUser(
         user_id=auth_user.sub,
         allowed_legal_entity_ids=allowed_legal_entities,
         current_legal_entity_id=current_legal_entity_id,
         permissions=set(auth_user.roles),
+        allowed_region_codes=allowed_regions,
+        is_super_admin=is_super_admin,
         correlation_id=correlation_id,
     )
 

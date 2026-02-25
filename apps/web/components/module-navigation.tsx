@@ -1,22 +1,27 @@
 "use client";
 
-import type { ModuleKey } from "@nexa/shared";
 import {
   BadgeDollarSign,
+  BarChart3,
   Building2,
   ClipboardList,
   CreditCard,
   Headset,
   LayoutGrid,
+  Shield,
   Store,
+  Wrench,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
-const moduleItems: { key: ModuleKey; label: string; href: string; icon: ComponentType<{ className?: string }> }[] = [
+const moduleItems: { key: string; label: string; href: string; icon: ComponentType<{ className?: string }> }[] = [
   { key: "admin", label: "Admin", href: "/admin", icon: Building2 },
+  { key: "sales-hub", label: "Sales", href: "/sales", icon: Users },
+  { key: "ops-hub", label: "Ops", href: "/ops", icon: Wrench },
+  { key: "reports-hub", label: "Reports", href: "/reports", icon: BarChart3 },
   { key: "crm", label: "CRM", href: "/crm", icon: Users },
   { key: "catalog", label: "Catalog", href: "/catalog", icon: Store },
   { key: "revenue", label: "Revenue", href: "/revenue", icon: BadgeDollarSign },
@@ -40,7 +45,7 @@ export function ModuleNavigation() {
             href="/"
             className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${pathname === "/" ? "bg-slate-900 text-white" : "hover:bg-slate-100"}`}
           >
-            <LayoutGrid className="h-4 w-4" />
+            <Shield className="h-4 w-4" />
             Overview
           </Link>
         </li>
@@ -59,6 +64,15 @@ export function ModuleNavigation() {
             </li>
           );
         })}
+        <li>
+          <Link
+            href="/finance"
+            className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${pathname === "/finance" || pathname.startsWith("/finance/") ? "bg-slate-900 text-white" : "hover:bg-slate-100"}`}
+          >
+            <BarChart3 className="h-4 w-4" />
+            Finance
+          </Link>
+        </li>
       </ul>
     </nav>
   );

@@ -6,7 +6,7 @@ import logging
 import re
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -22,6 +22,7 @@ from app import audit, events
 from app.context import reset_correlation_id, reset_workflow_depth, set_correlation_id, set_workflow_depth
 from app.metrics import observe_job, observe_workflow_guardrail_block
 from app.core.config import get_settings
+from app.crm.repositories import ContactRepository
 from app.crm.models import (
     CRMAccount,
     CRMAccountLegalEntity,
@@ -44,6 +45,10 @@ from app.crm.models import (
     CRMWorkflowRule,
 )
 from app.revenue.client import RevenueClient, StubRevenueClient
+from app.platform.security.context import AuthContext
+from app.platform.security.errors import AuthorizationError, ForbiddenFieldError
+from app.platform.security.fls import validate_fls_write
+from app.platform.security.rls import validate_rls_write
 from app.crm.search import (
     build_search_doc_for_account,
     build_search_doc_for_contact,
@@ -134,7 +139,35 @@ class ActorUser:
     allowed_legal_entity_ids: list[uuid.UUID]
     current_legal_entity_id: uuid.UUID | None
     permissions: set[str]
+    allowed_region_codes: list[str] = field(default_factory=list)
+    is_super_admin: bool = False
     correlation_id: str | None = None
+
+
+def _to_auth_context(actor_user: ActorUser, *, tenant_id: str | None = None) -> AuthContext:
+    resolved_tenant = tenant_id
+    if resolved_tenant is None and actor_user.current_legal_entity_id is not None:
+        resolved_tenant = str(actor_user.current_legal_entity_id)
+
+    cache_key = actor_user.correlation_id or "request"
+    cached = getattr(actor_user, "_authz_cache", None)
+    cached_key = getattr(actor_user, "_authz_cache_key", None)
+    if not isinstance(cached, dict) or cached_key != cache_key:
+        cached = {}
+        setattr(actor_user, "_authz_cache", cached)
+        setattr(actor_user, "_authz_cache_key", cache_key)
+
+    return AuthContext(
+        user_id=actor_user.user_id,
+        tenant_id=resolved_tenant,
+        correlation_id=actor_user.correlation_id,
+        is_super_admin=actor_user.is_super_admin,
+        roles=[],
+        permissions=sorted(actor_user.permissions),
+        entity_scope=[str(item) for item in actor_user.allowed_legal_entity_ids],
+        region_scope=sorted(set(actor_user.allowed_region_codes)),
+        _cache=cached,
+    )
 
 
 def _actor_with_correlation_id(actor_user: ActorUser, correlation_id: str | None) -> ActorUser:
@@ -143,6 +176,8 @@ def _actor_with_correlation_id(actor_user: ActorUser, correlation_id: str | None
         allowed_legal_entity_ids=actor_user.allowed_legal_entity_ids,
         current_legal_entity_id=actor_user.current_legal_entity_id,
         permissions=actor_user.permissions,
+        allowed_region_codes=actor_user.allowed_region_codes,
+        is_super_admin=actor_user.is_super_admin,
         correlation_id=correlation_id,
     )
 
@@ -499,6 +534,7 @@ class CustomFieldService:
 
 
 custom_field_service = CustomFieldService()
+contact_repository = ContactRepository()
 
 
 class AccountService:
@@ -907,6 +943,23 @@ class ContactService:
                 detail="Contact cannot be created for deleted or inactive account",
             )
 
+        auth_ctx = _to_auth_context(actor_user)
+        existing_scope = {
+            "company_code": str(self._first_legal_entity_id(account)),
+            "region_code": account.primary_region_code,
+        }
+        try:
+            contact_repository.validate_write_security(
+                dto.model_dump(exclude={"account_id"}),
+                auth_ctx,
+                existing_scope=existing_scope,
+                action="create",
+            )
+        except ForbiddenFieldError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"forbidden_fields": exc.fields})
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+
         try:
             if dto.is_primary:
                 session.execute(
@@ -990,7 +1043,7 @@ class ContactService:
                 detail="Primary contact conflict for account",
             )
 
-        return self._to_read_model(session, contact.id)
+        return self._to_read_model(session, contact.id, actor_user=actor_user)
 
     def list_contacts_for_account(
         self,
@@ -1022,19 +1075,22 @@ class ContactService:
             stmt = stmt.where(CRMContact.owner_user_id == filters["owner_user_id"])
 
         offset = int(cursor) if cursor and cursor.isdigit() else 0
+        stmt = contact_repository.apply_scope_query(stmt, _to_auth_context(actor_user))
         stmt = stmt.order_by(CRMContact.created_at.desc()).offset(offset).limit(limit)
         contacts = session.scalars(stmt).all()
-        return [self._to_read_model(session, contact.id) for contact in contacts]
+        return [self._to_read_model(session, contact.id, actor_user=actor_user) for contact in contacts]
 
     def get_contact(self, session: Session, actor_user: ActorUser, contact_id: uuid.UUID) -> ContactRead:
-        contact = session.scalar(
+        auth_ctx = _to_auth_context(actor_user)
+        query = (
             select(CRMContact)
             .where(and_(CRMContact.id == contact_id, CRMContact.deleted_at.is_(None)))
             .options(selectinload(CRMContact.account).selectinload(CRMAccount.legal_entities))
         )
+        contact = session.scalar(contact_repository.apply_scope_query(query, auth_ctx))
         if contact is None or not self._can_view_account(actor_user, contact.account):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
-        return self._to_read_model(session, contact.id)
+        return self._to_read_model(session, contact.id, actor_user=actor_user)
 
     def update_contact(
         self,
@@ -1043,11 +1099,13 @@ class ContactService:
         contact_id: uuid.UUID,
         dto: ContactUpdate,
     ) -> ContactRead:
-        contact = session.scalar(
+        auth_ctx = _to_auth_context(actor_user)
+        query = (
             select(CRMContact)
             .where(and_(CRMContact.id == contact_id, CRMContact.deleted_at.is_(None)))
             .options(selectinload(CRMContact.account).selectinload(CRMAccount.legal_entities))
         )
+        contact = session.scalar(contact_repository.apply_scope_query(query, auth_ctx))
         if contact is None or not self._can_view_account(actor_user, contact.account):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
 
@@ -1075,8 +1133,27 @@ class ContactService:
         if "email" in payload:
             changes["email"] = str(payload["email"]) if payload["email"] is not None else None
 
+        write_payload_for_validation = dict(changes)
+        if custom_fields_provided:
+            write_payload_for_validation["custom_fields"] = custom_fields_payload
+        existing_scope = {
+            "company_code": str(self._first_legal_entity_id(contact.account)),
+            "region_code": contact.account.primary_region_code,
+        }
+        try:
+            contact_repository.validate_write_security(
+                write_payload_for_validation,
+                auth_ctx,
+                existing_scope=existing_scope,
+                action="update",
+            )
+        except ForbiddenFieldError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"forbidden_fields": exc.fields})
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+
         if not changes and not custom_fields_provided:
-            return self._to_read_model(session, contact.id)
+            return self._to_read_model(session, contact.id, actor_user=actor_user)
 
         changes["updated_at"] = utcnow()
         changes["row_version"] = CRMContact.row_version + 1
@@ -1167,7 +1244,7 @@ class ContactService:
                 correlation_id=actor_user.correlation_id,
             )
             session.commit()
-            return self._to_read_model(session, contact.id)
+            return self._to_read_model(session, contact.id, actor_user=actor_user)
         except IntegrityError:
             session.rollback()
             raise HTTPException(
@@ -1210,12 +1287,35 @@ class ContactService:
         )
         session.commit()
 
-    def _to_read_model(self, session: Session, contact_id: uuid.UUID) -> ContactRead:
-        contact = session.scalar(select(CRMContact).where(CRMContact.id == contact_id))
+    def _to_read_model(self, session: Session, contact_id: uuid.UUID, actor_user: ActorUser | None = None) -> ContactRead:
+        contact = session.scalar(
+            select(CRMContact)
+            .where(CRMContact.id == contact_id)
+            .options(selectinload(CRMContact.account).selectinload(CRMAccount.legal_entities))
+        )
         if contact is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
         custom_fields = custom_field_service.get_values_for_entity(session, "contact", contact.id)
-        return self._to_read(contact, custom_fields)
+        read_model = self._to_read(contact, custom_fields)
+        if actor_user is None:
+            return read_model
+
+        auth_ctx = _to_auth_context(actor_user)
+        try:
+            contact_repository.validate_read_scope(
+                auth_ctx,
+                company_code=str(self._first_legal_entity_id(contact.account)),
+                region_code=contact.account.primary_region_code,
+                action="read",
+            )
+        except AuthorizationError:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="contact not found")
+
+        secured_payload = contact_repository.apply_read_security(
+            read_model.model_dump(mode="json"),
+            auth_ctx,
+        )
+        return ContactRead.model_validate(secured_payload)
 
     def _to_read(self, contact: CRMContact, custom_fields: dict[str, Any] | None = None) -> ContactRead:
         return ContactRead.model_validate(
@@ -1252,6 +1352,10 @@ class ContactService:
 
     def _can_view_account(self, actor_user: ActorUser, account: CRMAccount) -> bool:
         if "crm.contacts.read_all" in actor_user.permissions:
+            return True
+        if actor_user.allowed_region_codes and account.primary_region_code not in set(actor_user.allowed_region_codes):
+            return False
+        if not actor_user.allowed_legal_entity_ids:
             return True
         allowed = set(actor_user.allowed_legal_entity_ids)
         return any(link.legal_entity_id in allowed for link in account.legal_entities)
@@ -4018,6 +4122,17 @@ class WorkflowService:
         dry_run: bool,
     ) -> dict[str, Any]:
         context = context_bundle["context"]
+        resource = f"crm.{context_bundle['entity_type']}"
+        auth_ctx = _to_auth_context(
+            actor_user,
+            tenant_id=(
+                str(context_bundle.get("legal_entity_id")) if context_bundle.get("legal_entity_id") is not None else None
+            ),
+        )
+        existing_scope = {
+            "company_code": str(context_bundle.get("legal_entity_id")) if context_bundle.get("legal_entity_id") else None,
+            "region_code": context.get("region_code") or context.get("primary_region_code"),
+        }
         exists, before = self._resolve_path(context, action.path)
         _ = exists
         plan = {
@@ -4031,6 +4146,19 @@ class WorkflowService:
             field_key = action.path.split(".", 1)[1]
             if not field_key:
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid custom field path")
+            try:
+                validate_rls_write(
+                    resource,
+                    {f"custom_fields.{field_key}": action.value},
+                    auth_ctx,
+                    existing_scope=existing_scope,
+                    action="workflow.set_field",
+                )
+                validate_fls_write(resource, {f"custom_fields.{field_key}": action.value}, auth_ctx)
+            except ForbiddenFieldError as exc:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"forbidden_fields": exc.fields})
+            except AuthorizationError as exc:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
             if dry_run:
                 return plan
 
@@ -4051,6 +4179,20 @@ class WorkflowService:
         allowed = self._set_field_allowlist[context_bundle["entity_type"]]
         if action.path not in allowed:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"field not allowed: {action.path}")
+
+        try:
+            validate_rls_write(
+                resource,
+                {action.path: action.value},
+                auth_ctx,
+                existing_scope=existing_scope,
+                action="workflow.set_field",
+            )
+            validate_fls_write(resource, {action.path: action.value}, auth_ctx)
+        except ForbiddenFieldError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"forbidden_fields": exc.fields})
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
 
         if dry_run:
             return plan

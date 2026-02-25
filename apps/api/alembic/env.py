@@ -5,7 +5,14 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.core.database import Base
+from app.business.billing import models as billing_models  # noqa: F401
+from app.business.payments import models as payments_models  # noqa: F401
+from app.business.catalog import models as catalog_models  # noqa: F401
+from app.business.revenue import models as revenue_models  # noqa: F401
+from app.business.subscription import models as subscription_models  # noqa: F401
+from app.authz import models as authz_models  # noqa: F401
 from app.crm import models as crm_models  # noqa: F401
+from app.platform.ledger import models as ledger_models  # noqa: F401
 from app.models import audit  # noqa: F401
 
 config = context.config

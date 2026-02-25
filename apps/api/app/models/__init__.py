@@ -1,4 +1,23 @@
 from app.models.audit import AuditLog
+from app.business.billing.models import (
+	BillingCreditNote,
+	BillingCreditNoteLine,
+	BillingDunningCase,
+	BillingInvoice,
+	BillingInvoiceLine,
+)
+from app.business.payments.models import Payment, PaymentAllocation, Refund
+from app.business.catalog.models import CatalogPricebook, CatalogPricebookItem, CatalogProduct
+from app.business.revenue.models import RevenueContract, RevenueOrder, RevenueOrderLine, RevenueQuote, RevenueQuoteLine
+from app.business.subscription.models import (
+	Subscription,
+	SubscriptionChange,
+	SubscriptionItem,
+	SubscriptionPlan,
+	SubscriptionPlanItem,
+)
+from app.authz.models import Permission, PolicySet, Role, RolePermission, TenantPolicy, UserRole
+from app.platform.ledger.models import JournalEntry, JournalLine, LedgerAccount
 from app.crm.models import (
 	CRMAccount,
 	CRMAccountLegalEntity,
@@ -16,6 +35,27 @@ from app.crm.models import (
 
 __all__ = [
 	"AuditLog",
+	"BillingInvoice",
+	"BillingInvoiceLine",
+	"BillingCreditNote",
+	"BillingCreditNoteLine",
+	"BillingDunningCase",
+	"Payment",
+	"PaymentAllocation",
+	"Refund",
+	"CatalogProduct",
+	"CatalogPricebook",
+	"CatalogPricebookItem",
+	"RevenueQuote",
+	"RevenueQuoteLine",
+	"RevenueOrder",
+	"RevenueOrderLine",
+	"RevenueContract",
+	"SubscriptionPlan",
+	"SubscriptionPlanItem",
+	"Subscription",
+	"SubscriptionItem",
+	"SubscriptionChange",
 	"CRMAccount",
 	"CRMAccountLegalEntity",
 	"CRMActivity",
@@ -28,4 +68,13 @@ __all__ = [
 	"CRMPipeline",
 	"CRMPipelineStage",
 	"CRMOpportunity",
+	"Role",
+	"Permission",
+	"RolePermission",
+	"UserRole",
+	"PolicySet",
+	"TenantPolicy",
+	"LedgerAccount",
+	"JournalEntry",
+	"JournalLine",
 ]

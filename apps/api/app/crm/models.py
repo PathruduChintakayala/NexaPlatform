@@ -22,8 +22,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.revenue.models import RevenueOrder as CRMRevOrder
-from app.revenue.models import RevenueQuote as CRMRevQuote
+from app.revenue.models import LegacyRevenueOrder as CRMRevOrder
+from app.revenue.models import LegacyRevenueQuote as CRMRevQuote
 
 
 def utcnow() -> datetime:

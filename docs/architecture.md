@@ -1,67 +1,102 @@
-# Architecture
+# System Architecture
 
-## High-Level
+## Overview
+NEXA PLATFORM is a monorepo modular-monolith where `apps/api` and `apps/web` are developed and run together via Docker Compose, while `packages/shared` and `packages/ui` provide reusable contracts/components.
 
-This repository uses a **modular monolith** approach:
+Source references:
+- `README.md`
+- `package.json`
+- `pnpm-workspace.yaml`
+- `infra/docker-compose.yml`
 
-- One deployable API service (`apps/api`)
-- One deployable web service (`apps/web`)
-- Shared cross-cutting packages (`packages/shared`, `packages/ui`)
+## Component Diagram
+```mermaid
+flowchart TB
+	subgraph Frontend
+		WEB[apps/web Next.js App Router]
+		SHARED[@nexa/shared]
+		UI[@nexa/ui]
+	end
 
-## Module Boundaries
+	subgraph Backend
+		API[apps/api FastAPI]
+		ROUTES[api/routes + domain routers]
+		SECURITY[platform/security RLS/FLS/policies]
+		EVENTS[event_bus + domain events]
+		METRICS[Prometheus metrics]
+		OTEL[OpenTelemetry instrumentation]
+	end
 
-Backend module skeletons live in:
+	subgraph Data
+		PG[(PostgreSQL)]
+		REDIS[(Redis)]
+	end
 
-- `app/modules/admin`
-- `app/modules/crm`
-- `app/modules/catalog`
-- `app/modules/revenue`
-- `app/modules/billing`
-- `app/modules/payments`
-- `app/modules/support`
+	WEB --> API
+	WEB --> SHARED
+	WEB --> UI
+	API --> ROUTES
+	ROUTES --> SECURITY
+	ROUTES --> EVENTS
+	API --> METRICS
+	API --> OTEL
+	API --> PG
+	API --> REDIS
+```
 
-Boundary rules:
+Diagram references:
+- `apps/web/app/layout.tsx`
+- `apps/web/lib/api/core.ts`
+- `apps/api/app/main.py`
+- `apps/api/app/api/routes.py`
+- `apps/api/app/platform/security/*.py`
+- `apps/api/app/metrics.py`
+- `apps/api/app/otel.py`
 
-1. A module owns its domain models, application services, and API routes.
-2. Cross-module calls must occur through explicit service interfaces/events.
-3. Cross-cutting concerns belong under `app/core` or shared packages.
+## Request Lifecycle
+```mermaid
+sequenceDiagram
+	participant Browser
+	participant Web as Next.js Page
+	participant Client as web/lib/api/core.ts
+	participant API as FastAPI App
+	participant MW as Middleware Stack
+	participant Router as Domain Router
+	participant Repo as Repository/Service
+	participant DB as PostgreSQL
 
-## Cross-Cutting Components
+	Browser->>Web: user action
+	Web->>Client: API wrapper call
+	Client->>API: HTTP + bearer token + x-correlation-id
+	API->>MW: request pipeline
+	MW->>Router: validated/enriched request
+	Router->>Repo: domain operation
+	Repo->>DB: read/write
+	DB-->>Repo: result
+	Repo-->>Router: response model
+	Router-->>Client: JSON + status
+	Client-->>Web: typed payload/error
+	Web-->>Browser: render/update
+```
 
-### Request Context
+Lifecycle references:
+- `apps/web/lib/api/core.ts`
+- `apps/api/app/main.py`
+- `apps/api/app/middleware/*.py`
+- `apps/api/app/api/routes.py`
+- `apps/api/app/**/repository.py`
 
-`RequestContextMiddleware` enriches each request with:
+## Deployment/Runtime Assumptions
+- Local-first orchestration with Docker Compose (`infra/docker-compose.yml`).
+- API runs with code reload (`poetry run uvicorn ... --reload`) in compose.
+- Web runs via `pnpm --filter @nexa/web dev` in compose.
+- Migrations managed through Alembic (`apps/api/alembic`).
 
-- `request_id`
-- `legal_entity`
-- `region`
-- `currency`
-- `user_id` (when available)
+Source references:
+- `infra/docker-compose.yml`
+- `package.json`
+- `apps/api/alembic/env.py`
+- `apps/api/alembic.ini`
 
-This provides the foundation for jurisdiction and currency-aware behavior.
-
-### Auth + RBAC
-
-- `app/core/auth.py`: JWT verification stub (`get_current_user`)
-- `app/core/rbac.py`: permission hook placeholder (`require_permissions`)
-
-TODO: Integrate real IdP and policy engine.
-
-### Audit
-
-- `app/models/audit.py`: `audit_logs` table model
-- `app/services/audit.py`: `write_audit_log` helper
-
-TODO: call from module command handlers and critical write paths.
-
-### Event Bus
-
-- `app/core/events.py`: in-process publish/subscribe abstraction
-
-Use this for decoupled internal domain events inside the monolith. If async/event streaming is needed later, replace implementation while preserving interface.
-
-### Background Jobs
-
-- `app/core/celery_app.py`: Celery baseline wired to Redis
-
-TODO: add dedicated worker process and task modules per bounded module.
+## Notes
+- Existing database reference remains in `docs/database.md`.

@@ -4,6 +4,14 @@ from fastapi.responses import Response
 from app.core.auth import AuthUser, get_current_user
 from app.core.config import get_settings
 from app.metrics import generate_metrics_payload, metrics_content_type
+from app.business.catalog.api import router as catalog_router
+from app.business.billing.api import router as billing_router
+from app.business.payments.api import router as payments_router
+from app.business.revenue.api import router as revenue_router
+from app.business.subscription.api import router as subscription_router
+from app.business.reporting.finance.api import router as reporting_finance_router
+from app.authz.api import admin_router
+from app.platform.ledger.api import router as ledger_router
 from app.crm.api import (
     activities_router,
     audit_router,
@@ -22,6 +30,14 @@ from app.crm.api import (
 )
 
 router = APIRouter()
+router.include_router(admin_router)
+router.include_router(catalog_router)
+router.include_router(billing_router)
+router.include_router(payments_router)
+router.include_router(revenue_router)
+router.include_router(subscription_router)
+router.include_router(reporting_finance_router)
+router.include_router(ledger_router)
 router.include_router(crm_accounts_router)
 router.include_router(contacts_router)
 router.include_router(leads_router)

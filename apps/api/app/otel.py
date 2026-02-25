@@ -68,11 +68,28 @@ def setup_inmemory_otel(service_name: str = "api") -> InMemorySpanExporter:
     provider = _get_or_create_provider(service_name)
     exporter = InMemorySpanExporter()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
+    _ensure_fastapi_instrumented_for_tests()
     return exporter
 
 
 def get_tracer(name: str):
     return trace.get_tracer(name)
+
+
+def _ensure_fastapi_instrumented_for_tests() -> None:
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        from app.main import app
+    except Exception:
+        return
+
+    if getattr(app, "_is_instrumented_by_opentelemetry", False):
+        return
+
+    try:
+        FastAPIInstrumentor().instrument_app(app, server_request_hook=get_fastapi_server_request_hook())
+    except RuntimeError:
+        return
 
 
 def get_fastapi_server_request_hook():

@@ -13,6 +13,8 @@ sqlalchemy = "^2.0.40"
 psycopg = { extras = ["binary"], version = "^3.2.9" }
 alembic = "^1.14.1"
 pydantic = "^2.11.0"
+email-validator = "^2.2.0"
+python-multipart = "^0.0.20"
 pydantic-settings = "^2.8.1"
 python-jose = { extras = ["cryptography"], version = "^3.4.0" }
 celery = "^5.4.0"

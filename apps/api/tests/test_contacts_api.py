@@ -15,6 +15,7 @@ from app.crm.api import get_current_user
 from app.crm.models import CRMAccount, CRMAccountLegalEntity
 from app.crm.service import ActorUser
 from app.main import app
+from app.platform.security.policies import InMemoryPolicyBackend, set_policy_backend
 
 
 @pytest.fixture()
@@ -254,6 +255,32 @@ def test_list_contacts_scoped_by_account_legal_entity(
     assert list_other.status_code == 404
 
 
+def test_update_contact_blocked_for_out_of_scope_company(
+    client: tuple[TestClient, Callable[[str], None]],
+    accounts: dict[str, uuid.UUID],
+) -> None:
+    test_client, set_actor = client
+
+    set_actor("user2")
+    created = test_client.post(
+        f"/api/crm/accounts/{accounts['a2']}/contacts",
+        json={
+            "account_id": str(accounts["a2"]),
+            "first_name": "Scoped",
+            "last_name": "Target",
+        },
+    )
+    assert created.status_code == 201
+    contact = created.json()
+
+    set_actor("user1")
+    blocked = test_client.patch(
+        f"/api/crm/contacts/{contact['id']}",
+        json={"row_version": contact["row_version"], "title": "Director"},
+    )
+    assert blocked.status_code in {403, 404}
+
+
 def test_update_contact_row_version_conflict(
     client: tuple[TestClient, Callable[[str], None]],
     accounts: dict[str, uuid.UUID],
@@ -306,3 +333,34 @@ def test_delete_contact_soft(
     assert listed.status_code == 200
     ids = [item["id"] for item in listed.json()]
     assert contact_id not in ids
+
+
+def test_update_contact_forbidden_field_by_fls(
+    client: tuple[TestClient, Callable[[str], None]],
+    accounts: dict[str, uuid.UUID],
+) -> None:
+    test_client, _set_actor = client
+    created = test_client.post(
+        f"/api/crm/accounts/{accounts['a1']}/contacts",
+        json={
+            "account_id": str(accounts["a1"]),
+            "first_name": "Fls",
+            "last_name": "Target",
+        },
+    )
+    assert created.status_code == 201
+    contact = created.json()
+
+    set_policy_backend(InMemoryPolicyBackend(default_allow=False))
+    try:
+        response = test_client.patch(
+            f"/api/crm/contacts/{contact['id']}",
+            json={"row_version": contact["row_version"], "title": "Director"},
+        )
+    finally:
+        set_policy_backend(InMemoryPolicyBackend(default_allow=True))
+
+    assert response.status_code == 403
+    body = response.json()
+    detail = body.get("detail", body.get("error", body))
+    assert "forbidden_fields" in str(detail)

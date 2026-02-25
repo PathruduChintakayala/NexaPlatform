@@ -8,6 +8,9 @@ import { SampleScopeForm } from "../components/sample-form";
 
 const modules = [
   { key: "admin", label: "Admin" },
+  { key: "sales", label: "Sales" },
+  { key: "ops", label: "Ops" },
+  { key: "reports", label: "Reports" },
   { key: "crm", label: "CRM" },
   { key: "catalog", label: "Catalog" },
   { key: "revenue", label: "Revenue" },

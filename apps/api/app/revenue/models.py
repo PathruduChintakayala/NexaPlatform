@@ -13,7 +13,7 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class RevenueQuote(Base):
+class LegacyRevenueQuote(Base):
     __tablename__ = "rev_quote"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -27,7 +27,7 @@ class RevenueQuote(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
 
-class RevenueOrder(Base):
+class LegacyRevenueOrder(Base):
     __tablename__ = "rev_order"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -41,7 +41,7 @@ class RevenueOrder(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
 
-Index("ix_rev_quote_opportunity_id", RevenueQuote.opportunity_id)
-Index("ix_rev_quote_status", RevenueQuote.status)
-Index("ix_rev_order_opportunity_id", RevenueOrder.opportunity_id)
-Index("ix_rev_order_status", RevenueOrder.status)
+Index("ix_rev_quote_opportunity_id", LegacyRevenueQuote.opportunity_id)
+Index("ix_rev_quote_status", LegacyRevenueQuote.status)
+Index("ix_rev_order_opportunity_id", LegacyRevenueOrder.opportunity_id)
+Index("ix_rev_order_status", LegacyRevenueOrder.status)

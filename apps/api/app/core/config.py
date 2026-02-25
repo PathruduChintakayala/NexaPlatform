@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     rate_limit_crm_mutations_per_minute: int = 60
     metrics_enabled: bool = False
     otel_enabled: bool = False
+    authz_policy_backend: str = "auto"
+    authz_default_allow: bool = True
+    revenue_post_to_ledger: bool = False
+    billing_post_to_ledger: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 

@@ -424,3 +424,546 @@ export interface JobResponse {
   created_at: string;
   artifacts: JobArtifact[];
 }
+
+export interface FinanceAgingBucket {
+  label: string;
+  amount: string;
+}
+
+export interface FinanceAgingRow {
+  invoice_id: string;
+  invoice_number: string;
+  due_date: string | null;
+  days_overdue: number;
+  amount_due: string;
+  currency: string;
+  status: string;
+}
+
+export interface FinanceARAgingReport {
+  as_of_date: string;
+  total_amount_due: string;
+  buckets: FinanceAgingBucket[];
+  rows: FinanceAgingRow[];
+}
+
+export interface FinanceTrialBalanceRow {
+  account_id: string;
+  account_code: string;
+  account_name: string;
+  debit_total: string;
+  credit_total: string;
+  net_balance: string;
+}
+
+export interface FinanceTrialBalanceReport {
+  start_date: string | null;
+  end_date: string | null;
+  total_debits: string;
+  total_credits: string;
+  rows: FinanceTrialBalanceRow[];
+}
+
+export interface FinanceCashSummaryReport {
+  start_date: string | null;
+  end_date: string | null;
+  currency: string | null;
+  received_total: string;
+  refunded_total: string;
+  net_cash_total: string;
+  payment_count: number;
+  refund_count: number;
+}
+
+export interface FinanceRevenueSummaryReport {
+  start_date: string | null;
+  end_date: string | null;
+  invoiced_total: string;
+  credit_note_total: string;
+  net_revenue_total: string;
+  invoice_count: number;
+  credit_note_count: number;
+}
+
+export interface FinanceInvoicePaymentMismatch {
+  invoice_id: string;
+  invoice_number: string;
+  invoice_total: string;
+  allocated_total: string;
+  credit_note_total: string;
+  expected_amount_due: string;
+  actual_amount_due: string;
+  delta: string;
+}
+
+export interface FinanceLedgerLinkMismatch {
+  entity_type: string;
+  entity_id: string;
+  reference_number: string;
+  ledger_journal_entry_id: string | null;
+  issue: string;
+}
+
+export interface FinanceReconciliationReport {
+  start_date: string | null;
+  end_date: string | null;
+  invoice_payment_mismatches: FinanceInvoicePaymentMismatch[];
+  ledger_link_mismatches: FinanceLedgerLinkMismatch[];
+}
+
+export interface FinanceInvoiceDrilldown {
+  invoice: Record<string, unknown>;
+}
+
+export interface FinancePaymentDrilldown {
+  payment: Record<string, unknown>;
+}
+
+export interface FinanceJournalDrilldown {
+  journal_entry: Record<string, unknown>;
+}
+
+export interface AdminRoleRead {
+  id: string;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+  created_at: string;
+}
+
+export interface AdminRoleUpdate {
+  name?: string;
+  description?: string | null;
+}
+
+export interface AdminPermissionRead {
+  id: string;
+  resource: string;
+  action: string;
+  field: string | null;
+  scope_type: string | null;
+  scope_value: string | null;
+  effect: string;
+  description: string | null;
+  created_at: string;
+}
+
+export interface AdminPermissionUpdate {
+  resource?: string;
+  action?: string;
+  field?: string | null;
+  scope_type?: string | null;
+  scope_value?: string | null;
+  effect?: "allow" | "deny";
+  description?: string | null;
+}
+
+export interface AdminRolePermissionRead {
+  role_id: string;
+  role_name: string;
+  permission_id: string;
+  resource: string;
+  action: string;
+  field: string | null;
+  scope_type: string | null;
+  scope_value: string | null;
+  effect: string;
+  created_at: string;
+}
+
+export interface AdminUserRoleRead {
+  user_id: string;
+  role_id: string;
+  role_name: string;
+  created_at: string;
+}
+
+export interface BillingInvoiceRead {
+  id: string;
+  invoice_number: string;
+  status: string;
+  tenant_id: string;
+  company_code: string;
+  currency: string;
+  amount_total: string;
+  amount_due: string;
+  issued_at: string | null;
+  due_date: string | null;
+}
+
+export type BillingPeriod = "ONE_TIME" | "MONTHLY" | "QUARTERLY" | "ANNUAL";
+
+export interface CatalogProductRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  sku: string;
+  name: string;
+  description: string | null;
+  product_type?: string | null;
+  default_currency: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CatalogProductCreate {
+  tenant_id: string;
+  company_code: string;
+  region_code?: string | null;
+  sku: string;
+  name: string;
+  description?: string | null;
+  product_type?: string | null;
+  default_currency: string;
+  is_active?: boolean;
+}
+
+export interface CatalogPricebookRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  name: string;
+  currency: string;
+  is_default: boolean;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CatalogPricebookCreate {
+  tenant_id: string;
+  company_code: string;
+  region_code?: string | null;
+  name: string;
+  currency: string;
+  is_default?: boolean;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  is_active?: boolean;
+}
+
+export interface CatalogPricebookItemRead {
+  id: string;
+  pricebook_id: string;
+  product_id: string;
+  billing_period: BillingPeriod;
+  currency: string;
+  unit_price: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CatalogPricebookItemUpsert {
+  pricebook_id: string;
+  product_id: string;
+  billing_period: BillingPeriod;
+  currency: string;
+  unit_price: string;
+  usage_unit?: string | null;
+  is_active?: boolean;
+}
+
+export interface CatalogPriceRead {
+  tenant_id: string;
+  company_code: string;
+  sku: string;
+  product_id: string;
+  pricebook_id: string;
+  currency: string;
+  billing_period: BillingPeriod;
+  unit_price: string;
+  valid_from: string | null;
+  valid_to: string | null;
+}
+
+export interface RevenueQuoteLineRead {
+  id: string;
+  quote_id: string;
+  product_id: string;
+  pricebook_item_id: string;
+  description: string | null;
+  quantity: string;
+  unit_price: string;
+  line_total: string;
+}
+
+export interface RevenueQuoteRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  quote_number: string;
+  account_id: string | null;
+  currency: string;
+  status: string;
+  valid_until: string | null;
+  subtotal: string;
+  discount_total: string;
+  tax_total: string;
+  total: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  lines: RevenueQuoteLineRead[];
+}
+
+export interface RevenueQuoteCreate {
+  tenant_id: string;
+  company_code: string;
+  region_code?: string | null;
+  currency: string;
+  valid_until?: string | null;
+}
+
+export interface RevenueQuoteLineCreate {
+  product_id: string;
+  pricebook_item_id: string;
+  description?: string | null;
+  quantity: string;
+}
+
+export interface RevenueOrderLineRead {
+  id: string;
+  order_id: string;
+  product_id: string;
+  pricebook_item_id: string;
+  quantity: string;
+  unit_price: string;
+  line_total: string;
+  service_start: string | null;
+  service_end: string | null;
+}
+
+export interface RevenueOrderRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  order_number: string;
+  quote_id: string | null;
+  currency: string;
+  status: string;
+  subtotal: string;
+  discount_total: string;
+  tax_total: string;
+  total: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  lines: RevenueOrderLineRead[];
+}
+
+export interface RevenueContractRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  contract_number: string;
+  order_id: string;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+}
+
+export interface OpsPlanItemRead {
+  id: string;
+  plan_id: string;
+  product_id: string;
+  pricebook_item_id: string;
+  quantity_default: string;
+  unit_price_snapshot: string;
+  created_at: string;
+}
+
+export interface OpsPlanRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  name: string;
+  code: string;
+  currency: string;
+  status: string;
+  billing_period: string;
+  default_pricebook_id: string | null;
+  created_at: string;
+  items: OpsPlanItemRead[];
+}
+
+export interface OpsSubscriptionItemRead {
+  id: string;
+  subscription_id: string;
+  product_id: string;
+  pricebook_item_id: string;
+  quantity: string;
+  unit_price_snapshot: string;
+  created_at: string;
+}
+
+export interface OpsSubscriptionRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  subscription_number: string;
+  contract_id: string;
+  account_id: string | null;
+  currency: string;
+  status: string;
+  start_date: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  auto_renew: boolean;
+  renewal_term_count: number;
+  renewal_billing_period: string;
+  created_at: string;
+  updated_at: string;
+  items: OpsSubscriptionItemRead[];
+}
+
+export interface OpsSubscriptionChangeRead {
+  id: string;
+  subscription_id: string;
+  change_type: string;
+  effective_date: string;
+  payload_json: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface OpsInvoiceLineRead {
+  id: string;
+  invoice_id: string;
+  product_id: string | null;
+  description: string | null;
+  quantity: string;
+  unit_price_snapshot: string;
+  line_total: string;
+  source_type: string;
+  source_id: string | null;
+}
+
+export interface OpsInvoiceRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  invoice_number: string;
+  account_id: string | null;
+  subscription_id: string | null;
+  order_id: string | null;
+  currency: string;
+  status: string;
+  issue_date: string | null;
+  due_date: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  subtotal: string;
+  discount_total: string;
+  tax_total: string;
+  total: string;
+  amount_due: string;
+  ledger_journal_entry_id: string | null;
+  created_at: string;
+  updated_at: string;
+  lines: OpsInvoiceLineRead[];
+}
+
+export interface OpsCreditNoteLineRead {
+  id: string;
+  credit_note_id: string;
+  invoice_line_id: string | null;
+  description: string | null;
+  quantity: string;
+  unit_price_snapshot: string;
+  line_total: string;
+}
+
+export interface OpsCreditNoteRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  credit_note_number: string;
+  invoice_id: string;
+  currency: string;
+  status: string;
+  issue_date: string | null;
+  subtotal: string;
+  tax_total: string;
+  total: string;
+  ledger_journal_entry_id: string | null;
+  created_at: string;
+  lines: OpsCreditNoteLineRead[];
+}
+
+export interface OpsPaymentAllocationRead {
+  id: string;
+  payment_id: string;
+  invoice_id: string;
+  amount_allocated: string;
+  created_at: string;
+}
+
+export interface OpsRefundRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  payment_id: string;
+  amount: string;
+  reason: string;
+  status: string;
+  ledger_journal_entry_id: string | null;
+  created_at: string;
+}
+
+export interface OpsPaymentRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  region_code: string | null;
+  payment_number: string;
+  account_id: string | null;
+  currency: string;
+  amount: string;
+  status: string;
+  payment_method: string;
+  received_at: string | null;
+  ledger_journal_entry_id: string | null;
+  created_at: string;
+  allocations: OpsPaymentAllocationRead[];
+  refunds: OpsRefundRead[];
+}
+
+export interface OpsJournalLineRead {
+  id: string;
+  journal_entry_id: string;
+  account_id: string;
+  debit_amount: string;
+  credit_amount: string;
+  currency: string;
+  fx_rate_to_company_base: string;
+  amount_company_base: string;
+  memo: string | null;
+  dimensions_json: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface OpsJournalEntryRead {
+  id: string;
+  tenant_id: string;
+  company_code: string;
+  entry_date: string;
+  description: string;
+  source_module: string;
+  source_type: string;
+  source_id: string;
+  posting_status: string;
+  created_by: string;
+  created_at: string;
+  lines: OpsJournalLineRead[];
+}

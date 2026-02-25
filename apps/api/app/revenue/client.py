@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.context import get_correlation_id
-from app.revenue.models import RevenueOrder, RevenueQuote
+from app.revenue.models import LegacyRevenueOrder, LegacyRevenueQuote
 
 
 tracer = trace.get_tracer("app.revenue.client")
@@ -37,7 +37,7 @@ class StubRevenueClient:
         with tracer.start_as_current_span("revenue.create_draft_quote") as span:
             span.set_attribute("opportunity_id", str(opportunity_id))
             span.set_attribute("correlation_id", get_correlation_id())
-            quote = RevenueQuote(opportunity_id=opportunity_id, status="DRAFT")
+            quote = LegacyRevenueQuote(opportunity_id=opportunity_id, status="DRAFT")
             self.session.add(quote)
             self.session.flush()
             span.set_attribute("quote_id", str(quote.id))
@@ -47,7 +47,7 @@ class StubRevenueClient:
         with tracer.start_as_current_span("revenue.create_draft_order") as span:
             span.set_attribute("opportunity_id", str(opportunity_id))
             span.set_attribute("correlation_id", get_correlation_id())
-            order = RevenueOrder(opportunity_id=opportunity_id, status="DRAFT")
+            order = LegacyRevenueOrder(opportunity_id=opportunity_id, status="DRAFT")
             self.session.add(order)
             self.session.flush()
             span.set_attribute("order_id", str(order.id))
@@ -57,7 +57,7 @@ class StubRevenueClient:
         with tracer.start_as_current_span("revenue.get_quote") as span:
             span.set_attribute("quote_id", str(quote_id))
             span.set_attribute("correlation_id", get_correlation_id())
-            row = self.session.scalar(select(RevenueQuote).where(RevenueQuote.id == quote_id))
+            row = self.session.scalar(select(LegacyRevenueQuote).where(LegacyRevenueQuote.id == quote_id))
             if row is None:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="quote not found")
             if row.status not in self.quote_statuses:
@@ -69,7 +69,7 @@ class StubRevenueClient:
         with tracer.start_as_current_span("revenue.get_order") as span:
             span.set_attribute("order_id", str(order_id))
             span.set_attribute("correlation_id", get_correlation_id())
-            row = self.session.scalar(select(RevenueOrder).where(RevenueOrder.id == order_id))
+            row = self.session.scalar(select(LegacyRevenueOrder).where(LegacyRevenueOrder.id == order_id))
             if row is None:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
             if row.status not in self.order_statuses:

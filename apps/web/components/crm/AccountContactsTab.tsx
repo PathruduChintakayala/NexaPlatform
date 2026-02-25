@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { createContact, getErrorToastMessage, listContacts } from "../../lib/api";
+import { createContact, getErrorMessage, getErrorToastMessage, listContacts } from "../../lib/api";
 import { queryKeys } from "../../lib/queryKeys";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
